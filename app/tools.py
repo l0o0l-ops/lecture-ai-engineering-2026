@@ -7,6 +7,7 @@
 import json
 from functools import cache
 from pathlib import Path
+import random
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 MAX_RESULTS = 3
@@ -77,3 +78,32 @@ def get_lecture_summary(lecture: int) -> str:
         available = sorted(p.stem for p in (DATA_DIR / "lectures").glob("*.md"))
         return f"第{lecture}回の要点はまだありません。用意されている回: {', '.join(available)}"
     return path.read_text(encoding="utf-8")
+
+
+def make_quiz(lecture: int) -> str:
+    """
+    特定の回の確認問題を出してと頼まれたときに、用語集から問題を作れるようにします。
+    モデルが make_quiz を 指定されたx回の番号（第二回なら2）で呼び、ツールが第x回の用語を1つ選んで問題と答えを返し、
+    モデルがそれを使って出題します。
+    """
+    glossary = load_glossary()
+
+    # 指定された回の用語をフィルタリング
+    target_terms = [e for e in glossary if e.get("lecture") == lecture]
+
+    if not target_terms:
+        return f"第{lecture}回の用語が見つかりませんでした。"
+
+    # 対象の用語からランダムに1つ選択
+    selected = random.choice(target_terms)
+
+    # モデルが問題作成・出題を行えるように情報をJSON形式で返す
+    return json.dumps(
+        {
+            "term": selected["term"],
+            "lecture": selected["lecture"],
+            "definition": selected["definition"],
+            "related": selected.get("related", []),
+        },
+        ensure_ascii=False,
+    )
